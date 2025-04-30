@@ -1,0 +1,43 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #4f4f4f; /* Light gray */
+    font-family: 'Arial', sans-serif;
+    color: #333;             /* Darker text */
+    font-weight: 600;
+  }
+  /* Full-page modal container */
+  .modal-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100%;
+  }
+  
+  /* Centered modal box */
+  .modal-box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 95%;
+    text-align: right;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Header section */
+  .header {
+    text-align: center;
+    background-color: #f8f8f8;
+    padding: 10px;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 20px;
+  }
+  
+  .header h1 {
+    font-size: 20px;
+    color: #000000; /* Black text */
+    font-weight: bold;
+    margin: 0;
+  }
