@@ -1,35 +1,52 @@
 'use client';
 
-import LoginView from '../../components/LoginView';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import './login.css';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const [rfid, setRFID] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleLogin = async ({ RFID, password }) => {
-    const response = await fetch('http://127.0.0.1:5000/login', {
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    const res = await fetch('http://localhost:5001/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ RFID, password }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rfid, password })
     });
 
-    if (!response.ok) {
-      throw new Error('Login failed');
+    const data = await res.json();
+
+    if (res.ok) {
+      localStorage.setItem('token', data.access_token);
+      window.location.href = '/dashboard';
+    } else {
+      setError(data.msg || 'Login failed');
     }
-
-    const data = await response.json();
-    console.log('Login success, token:', data.access_token);
-
-    // Optionally save token
-    localStorage.setItem('token', data.access_token);
-
-    // Redirect to dashboard
-    router.push('/dashboard');
   };
 
   return (
-    <LoginView onLogin={handleLogin} />
+    <div className="modal-container">
+      <div className="modal-box">
+        <div className="header">
+          <h1>UHere Login</h1>
+        </div>
+        <form onSubmit={handleLogin}>
+          <div className="input-group">
+            <label>RFID</label>
+            <input type="text" value={rfid} onChange={(e) => setRFID(e.target.value)} required />
+          </div>
+          <div className="input-group">
+            <label>Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          {error && <p className="error-text">{error}</p>}
+          <button className="login-btn" type="submit">Login</button>
+        </form>
+      </div>
+    </div>
   );
 }
+
