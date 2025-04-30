@@ -10,9 +10,8 @@ const LoginView = ({ onLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
     try {
-      await onLogin({ RFID, password });
+      await onLogin({ rfid_id: RFID, password });
     } catch (err) {
       console.error('Login error:', err);
       setError('Invalid credentials. Please try again.');

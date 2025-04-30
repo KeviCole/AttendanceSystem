@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 
 export default function StudentDashboard() {
   const [attendance, setAttendance] = useState([]);
-
   useEffect(() => {
     const token = localStorage.getItem('token');
     fetch('http://localhost:5001/attendance', {
@@ -11,17 +10,6 @@ export default function StudentDashboard() {
     })
       .then(res => res.json())
       .then(data => setAttendance(data));
-  }, []);
-
-  useEffect(() => {
-    // Sample attendance data
-    const sampleData = [
-      { date: '2025-04-15', status: 'Absent' },
-      { date: '2025-04-17', status: 'Present' },
-      { date: '2025-04-22', status: 'Absent' },
-      { date: '2025-04-24', status: 'Present' },
-    ];
-    setAttendance(sampleData);
   }, []);
 
   return (

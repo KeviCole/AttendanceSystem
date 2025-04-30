@@ -14,7 +14,8 @@ export default function LoginPage() {
     const res = await fetch('http://localhost:5001/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rfid, password })
+      body: JSON.stringify({ rfid_id: rfid, password })
+
     });
 
     const data = await res.json();

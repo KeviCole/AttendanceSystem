@@ -6,7 +6,7 @@ import './dashboard.css';
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
-  /*
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -19,14 +19,14 @@ export default function DashboardPage() {
   }, []);
 
   if (!user) return <div className="modal-container"><div className="modal-box">Loading...</div></div>;
-  */
+
   return (
     <div className="modal-container">
       <div className="modal-box">
         <div className="header">
           <h1>{user?.role === 'teacher' ? 'Manage Student Attendance' : 'Your Attendance'}</h1>
         </div>
-        {user?.role === 'teacher' ? <TeacherDashboard /> : <TeacherDashboard />}
+        {user?.role === 'teacher' ? <TeacherDashboard /> : <StudentDashboard />}
       </div>
     </div>
   );
