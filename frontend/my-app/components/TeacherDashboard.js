@@ -5,34 +5,41 @@ export default function TeacherDashboard() {
   const [students, setStudents] = useState([]);
 
   useEffect(() => {
-    // TEMP: simulate backend data
-    const mockData = [
-      { id: 1, time: '2025-04-28 08:30', status: 'Present' },
-      { id: 2, time: '2025-04-28 08:35', status: 'Absent' },
-      { id: 3, time: '2025-04-28 08:40', status: 'Present' },
-    ];
-    setStudents(mockData);
+    const token = localStorage.getItem('token');
+    fetch('http://localhost:5001/attendance', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => res.json())
+      .then(data => {
+        // Format the data if needed
+        const formatted = data.map(entry => ({
+          id: entry.student_id,
+          time: entry.date,
+          status: entry.status,
+        }));
+        setStudents(formatted);
+      })
+      .catch(err => {
+        console.error('Failed to fetch attendance:', err);
+      });
   }, []);
 
   const updateStatus = (studentId, newStatus) => {
-    // TEMP: Update locally for demo
     setStudents(prev =>
       prev.map(student =>
         student.id === studentId ? { ...student, status: newStatus } : student
       )
     );
-    // In real use, uncomment to push to backend:
-    /*
+
     const token = localStorage.getItem('token');
-    fetch(`http://localhost:5001/attendance/${studentId}`, {
-      method: 'PUT',
+    fetch(`http://localhost:5001/attendance`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    */
+      body: JSON.stringify({ student_id: studentId, status: newStatus }),
+    }).catch(err => console.error('Failed to update attendance:', err));
   };
 
   return (
@@ -51,7 +58,7 @@ export default function TeacherDashboard() {
                     padding: '6px 12px',
                     cursor: 'pointer'
                   }}
-            >
+              >
                 Present
               </button>
               <button 
@@ -70,6 +77,6 @@ export default function TeacherDashboard() {
       </ul>
     </div>
   );
-  
 }
+
 

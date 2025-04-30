@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from flask_cors import CORS
-from werkzeug.security import check_password_hash
 import mysql.connector
 from dotenv import load_dotenv
+import bcrypt
 import os
 
 load_dotenv()
@@ -29,9 +29,11 @@ def create_tables():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id VARCHAR(255) PRIMARY KEY,
+                rfid_id VARCHAR(255) UNIQUE,
                 password_hash TEXT NOT NULL,
                 role ENUM('student', 'teacher') NOT NULL
             )
@@ -51,28 +53,8 @@ def create_tables():
                 session_id VARCHAR(255),
                 user_id VARCHAR(255),
                 status ENUM('pending', 'present', 'absent') DEFAULT 'pending',
-                scanned_at DATETIME,
                 PRIMARY KEY (session_id, user_id),
                 FOREIGN KEY (session_id) REFERENCES class_sessions(session_id),
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
-            )
-        """)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS absences (
-                user_id VARCHAR(255),
-                course_code VARCHAR(50),
-                dates JSON NOT NULL,
-                PRIMARY KEY (user_id, course_code),
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
-            )
-        """)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS professor_course_map (
-                user_id VARCHAR(255),
-                course_code VARCHAR(50),
-                PRIMARY KEY (user_id, course_code),
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
         """)
@@ -87,6 +69,28 @@ def create_tables():
             )
         """)
 
+        # Hash passwords with bcrypt
+        student_password = "student123"
+        teacher_password = "teacher123"
+        student_hash = bcrypt.hashpw(student_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        teacher_hash = bcrypt.hashpw(teacher_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        # Add RFID-tagged users
+        cursor.execute("""
+            INSERT IGNORE INTO users (user_id, rfid_id, password_hash, role)
+            VALUES 
+                ('s001', 'RFID123STUDENT', %s, 'student'),
+                ('t001', 'RFID123TEACHER', %s, 'teacher')
+        """, (student_hash, teacher_hash))
+
+        # Add 3 attendance records for student
+        cursor.execute("""
+            INSERT IGNORE INTO attendance (student_id, date, status)
+                VALUES
+                ('s001', CURDATE() - INTERVAL 2 DAY, 'present'),
+                ('s001', CURDATE() - INTERVAL 1 DAY, 'absent'),
+                ('s001', CURDATE(), 'present');
+        """)
         conn.commit()
         cursor.close()
         conn.close()
@@ -94,37 +98,38 @@ def create_tables():
     except Exception as e:
         print("❌ Error creating tables:", str(e))
 
-# 🧠 LOGIN ROUTE
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email')
+    rfid_id = data.get('rfid_id')
     password = data.get('password')
 
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT user_id, password_hash, role FROM users WHERE email = %s", (email,))
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id, password_hash, role FROM users WHERE rfid_id = %s", (rfid_id,))
     result = cur.fetchone()
     cur.close()
+    conn.close()
 
     if not result:
         return jsonify({"msg": "User not found"}), 404
 
     user_id, hashed_pw, role = result
-    if not check_password_hash(hashed_pw, password):
+    if not bcrypt.checkpw(password.encode('utf-8'), hashed_pw.encode('utf-8')):
         return jsonify({"msg": "Incorrect password"}), 401
 
-    access_token = create_access_token(identity={"id": user_id, "role": role})
+    access_token = create_access_token(identity=user_id, additional_claims={"role": role})
     return jsonify(access_token=access_token), 200
 
-# ✅ GET ATTENDANCE (Role Based)
+
 @app.route('/attendance', methods=['GET'])
 @jwt_required()
 def get_attendance():
-    identity = get_jwt_identity()
-    role = identity.get('role')
-    user_id = identity.get('id')
+    user_id = get_jwt_identity()
+    role = get_jwt()["role"]
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
 
     if role == 'teacher':
         cur.execute("SELECT * FROM attendance")
@@ -133,10 +138,11 @@ def get_attendance():
 
     rows = cur.fetchall()
     cur.close()
+    conn.close()
 
-    # Return as JSON list of dicts
     attendance = [{"student_id": row[0], "date": str(row[1]), "status": row[2]} for row in rows]
     return jsonify(attendance)
+
 
 # ✅ MARK ATTENDANCE
 @app.route('/attendance', methods=['POST'])
