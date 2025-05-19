@@ -7,6 +7,7 @@ const LoginView = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Waits for login info to be sent to backend
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');

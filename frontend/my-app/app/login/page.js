@@ -8,20 +8,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Sends login information
   const handleLogin = async (e) => {
     e.preventDefault();
 
     const res = await fetch('http://localhost:5001/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rfid_id: rfid, password })
-
+      credentials: 'include',
+      body: JSON.stringify({ rfid_id: rfid, password }),
     });
 
     const data = await res.json();
 
+    // Redirect is login is successful
     if (res.ok) {
-      localStorage.setItem('token', data.access_token);
       window.location.href = '/dashboard';
     } else {
       setError(data.msg || 'Login failed');

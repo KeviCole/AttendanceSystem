@@ -1,16 +1,27 @@
-from flask import Flask, request, jsonify
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
-from flask_cors import CORS
-import mysql.connector
-from dotenv import load_dotenv
-import bcrypt
+from flask import Flask, request, jsonify # type: ignore
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt # type: ignore
+from flask_cors import CORS # type: ignore
+import mysql.connector # type: ignore
+from dotenv import load_dotenv # type: ignore
+import bcrypt # type: ignore
 import os
+from flask import make_response # type: ignore
+from datetime import timedelta
 
 load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+
+from flask_cors import CORS # type: ignore
+
+CORS(app,
+    supports_credentials=True,
+    origins=["http://localhost:3000"],
+    methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"])
+
+
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -21,8 +32,15 @@ def get_db_connection():
         port=int(os.getenv('MYSQL_PORT', 3306))
     )
 
+app.config['SECRET_KEY'] = 'your-generated-secure-key'
+app.config['JWT_SECRET_KEY'] = 'your-generated-secure-key'
+
 # JWT setup
-app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY", "super-secret")
+app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+app.config["JWT_COOKIE_NAME"] = "access_token_cookie"
+app.config["JWT_COOKIE_SECURE"] = False
+app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 jwt = JWTManager(app)
 
 def create_tables():
@@ -69,13 +87,13 @@ def create_tables():
             )
         """)
 
-        # Hash passwords with bcrypt
+        # Hashes passwords with bcrypt
         student_password = "student123"
         teacher_password = "teacher123"
         student_hash = bcrypt.hashpw(student_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         teacher_hash = bcrypt.hashpw(teacher_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        # Add RFID-tagged users
+        # Adds RFID-tagged users
         cursor.execute("""
             INSERT IGNORE INTO users (user_id, rfid_id, password_hash, role)
             VALUES 
@@ -83,7 +101,7 @@ def create_tables():
                 ('t001', 'RFID123TEACHER', %s, 'teacher')
         """, (student_hash, teacher_hash))
 
-        # Add 3 attendance records for student
+        # Adds 3 attendance records for student
         cursor.execute("""
             INSERT IGNORE INTO attendance (student_id, date, status)
                 VALUES
@@ -118,8 +136,25 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), hashed_pw.encode('utf-8')):
         return jsonify({"msg": "Incorrect password"}), 401
 
-    access_token = create_access_token(identity=user_id, additional_claims={"role": role})
-    return jsonify(access_token=access_token), 200
+    # Role access token
+    access_token = create_access_token(
+        identity=user_id,
+        additional_claims={"role": role},
+        expires_delta=timedelta(days=1)
+    )
+
+    # Clears and sets new cookie
+    response = make_response(jsonify({"msg": "Login successful"}), 200)
+    response.delete_cookie("access_token_cookie") # Clears old cookie
+    response.set_cookie(
+        "access_token_cookie",
+        access_token,
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+        max_age=60 * 60 * 24
+    )
+    return response
 
 
 @app.route('/attendance', methods=['GET'])
@@ -144,7 +179,7 @@ def get_attendance():
     return jsonify(attendance)
 
 
-# ✅ MARK ATTENDANCE
+# Mark Attendance Sample Function
 @app.route('/attendance', methods=['POST'])
 @jwt_required()
 def mark_attendance():
@@ -167,12 +202,14 @@ def mark_attendance():
 
     return jsonify({"msg": "Attendance marked successfully"})
 
-# ✅ EDIT ATTENDANCE (Only for teachers)
-@app.route('/attendance/<int:student_id>', methods=['PUT'])
+@app.route('/attendance/<student_id>', methods=['PUT', 'OPTIONS'])
 @jwt_required()
 def update_attendance(student_id):
-    identity = get_jwt_identity()
-    if identity.get('role') != 'teacher':
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    role = get_jwt()["role"]
+    if role.lower() != 'teacher':
         return jsonify({"msg": "Only teachers can edit attendance"}), 403
 
     data = request.get_json()
@@ -180,14 +217,33 @@ def update_attendance(student_id):
     status = data.get("status")
 
     if not (date and status):
-        return jsonify({"msg": "Date and new status required"}), 400
+        return jsonify({"msg": "Date and status required"}), 400
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    print(f"Incoming update for student_id={student_id}, date={date}, status={status}")
+
+    # Check if exists
+    cur.execute("SELECT 1 FROM attendance WHERE student_id = %s AND date = %s", (student_id, date))
+    if not cur.fetchone():
+        cur.close()
+        conn.close()
+        return jsonify({"msg": "Attendance record does not exist"}), 404
+
+    # Update only if it exists
     cur.execute("UPDATE attendance SET status = %s WHERE student_id = %s AND date = %s", (status, student_id, date))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
 
-    return jsonify({"msg": "Attendance updated"})
+    return jsonify({"msg": "Attendance updated"}), 200
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    response = make_response(jsonify({"msg": "Logged out"}), 200)
+    response.set_cookie("access_token_cookie", "", expires=0)
+    return response
 
 # ✅ RUN APP
 if __name__ == "__main__":
