@@ -51,7 +51,7 @@ body, html {
   .input-group label {
     display: block;
     font-weight: bold;
-    color: #000000; /* Black text */
+    color: #000000;
     margin-bottom: 5px;
   }
   
@@ -60,8 +60,8 @@ body, html {
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 5px;
-    color: #333;             /* Darker text */
-    font-weight: 600;        /* Bolder text */
+    color: #333;
+    font-weight: 600;
   }
   
   /* Login button */
@@ -76,11 +76,11 @@ body, html {
     margin-top: 10px;
     font-weight: bold;
   }
-  
+
   .login-btn:hover {
     opacity: 0.8;
   }
-  
+
   /* Error message */
   .error-text {
     color: red;
@@ -88,5 +88,3 @@ body, html {
     font-size: 0.9em;
     text-align: left;
   }
-  
-  

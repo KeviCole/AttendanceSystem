@@ -3,15 +3,14 @@ import { useEffect, useState } from 'react';
 
 export default function TeacherDashboard() {
   const [students, setStudents] = useState([]);
-
+  // Gets all students attendance
   useEffect(() => {
-    const token = localStorage.getItem('token');
     fetch('http://localhost:5001/attendance', {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     })
       .then(res => res.json())
       .then(data => {
-        // Format the data if needed
+        // Formats the data
         const formatted = data.map(entry => ({
           id: entry.student_id,
           time: entry.date,
@@ -24,22 +23,45 @@ export default function TeacherDashboard() {
       });
   }, []);
 
-  const updateStatus = (studentId, newStatus) => {
-    setStudents(prev =>
-      prev.map(student =>
-        student.id === studentId ? { ...student, status: newStatus } : student
-      )
-    );
+  // Sorts date and time field, defaults to midnight time until RFID set up
+  const formatDateToMySQL = (isoString) => {
+    const d = new Date(isoString);
+    d.setHours(0, 0, 0, 0);
 
-    const token = localStorage.getItem('token');
-    fetch(`http://localhost:5001/attendance`, {
-      method: 'POST',
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = '00';
+    const mi = '00';
+    const ss = '00';
+
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+  };
+
+  const updateStatus = (studentId, time, newStatus) => {
+    // PUT method to update status in backend
+    fetch(`http://localhost:5001/attendance/${studentId}`, {
+      method: 'PUT',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ student_id: studentId, status: newStatus }),
-    }).catch(err => console.error('Failed to update attendance:', err));
+      body: JSON.stringify({ date: formatDateToMySQL(time), status: newStatus })
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to update attendance");
+        setStudents(prev =>
+          prev.map(student =>
+            student.id === studentId && student.time === time
+              ? { ...student, status: newStatus }
+              : student
+          )
+        );
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Could not update attendance. Please try again.");
+      });
   };
 
   return (
@@ -50,7 +72,7 @@ export default function TeacherDashboard() {
             {student.id} – {student.time} – <em>{student.status}</em>
             <div style={{ marginTop: '8px' }}>
               <button 
-                onClick={() => updateStatus(student.id, 'Present')} 
+                onClick={() => updateStatus(student.id, student.time, 'present')} 
                 style={{
                     marginRight: '10px',
                     border: '1px solid #000',
@@ -61,11 +83,11 @@ export default function TeacherDashboard() {
               >
                 Present
               </button>
-              <button 
-                onClick={() => updateStatus(student.id, 'Absent')} 
+              <button
+                onClick={() => updateStatus(student.id, student.time, 'absent')}
                 style={{
-                    border: '1px solid #000', 
-                    background: 'transparent', 
+                    border: '1px solid #000',
+                    background: 'transparent',
                     padding: '6px 12px',
                     cursor: 'pointer'
                 }}>

@@ -2,9 +2,9 @@ body, html {
     margin: 0;
     padding: 0;
     height: 100%;
-    background: #4f4f4f; /* Light gray */
+    background: #4f4f4f;
     font-family: 'Arial', sans-serif;
-    color: #333;             /* Darker text */
+    color: #333;
     font-weight: 600;
   }
   /* Full-page modal container */
@@ -37,7 +37,7 @@ body, html {
   
   .header h1 {
     font-size: 20px;
-    color: #000000; /* Black text */
+    color: #000000;
     font-weight: bold;
     margin: 0;
   }
